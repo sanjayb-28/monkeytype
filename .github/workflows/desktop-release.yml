@@ -20,6 +20,7 @@ jobs:
           node-version: 24.11.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build-pkg
       - run: pnpm --dir frontend exec vitest run __tests__/desktop
       - name: Verify release version
         run: test "$(node -p "require('./desktop/package.json').version")" = "${GITHUB_REF_NAME#desktop-v}"
