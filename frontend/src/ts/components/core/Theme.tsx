@@ -1,8 +1,9 @@
 import { Link, Meta, MetaProvider, Style } from "@solidjs/meta";
 import { createEffect, createMemo, JSXElement, Show } from "solid-js";
+import { envConfig } from "virtual:env-config";
 
 import { themes } from "../../constants/themes";
-import { createDebouncedEffectOn } from "../../hooks/effects";
+import { createDebouncedEffectOn, createEffectOn } from "../../hooks/effects";
 import { useRefWithUtils } from "../../hooks/useRefWithUtils";
 import { hideLoaderBar, showLoaderBar } from "../../states/loader-bar";
 import { showNoticeNotification } from "../../states/notifications";
@@ -36,8 +37,8 @@ export function Theme(): JSXElement {
     showNoticeNotification("Failed to load theme");
   };
 
-  createDebouncedEffectOn(125, getTheme, (colors) => {
-    styleEl()?.setHtml(`
+  const applyThemeColors = (colors: ReturnType<typeof getTheme>): void => {
+    const css = `
 :root {
     --bg-color: ${colors.bg};
     --main-color: ${colors.main};
@@ -49,8 +50,48 @@ export function Theme(): JSXElement {
     --error-extra-color: ${colors.errorExtra};
     --colorful-error-color: ${colors.colorfulError};
     --colorful-error-extra-color: ${colors.colorfulErrorExtra};
-}`);
-  });
+}`;
+
+    if (envConfig.isDesktop) {
+      const rootStyle = document.documentElement.style;
+      // WKWebView can retain individual fallback custom properties from the
+      // desktop head during startup. Keep the runtime theme authoritative so
+      // every token changes together instead of leaving a mixed theme behind.
+      rootStyle.setProperty("--bg-color", colors.bg, "important");
+      rootStyle.setProperty("--main-color", colors.main, "important");
+      rootStyle.setProperty("--caret-color", colors.caret, "important");
+      rootStyle.setProperty("--sub-color", colors.sub, "important");
+      rootStyle.setProperty("--sub-alt-color", colors.subAlt, "important");
+      rootStyle.setProperty("--text-color", colors.text, "important");
+      rootStyle.setProperty("--error-color", colors.error, "important");
+      rootStyle.setProperty(
+        "--error-extra-color",
+        colors.errorExtra,
+        "important",
+      );
+      rootStyle.setProperty(
+        "--colorful-error-color",
+        colors.colorfulError,
+        "important",
+      );
+      rootStyle.setProperty(
+        "--colorful-error-extra-color",
+        colors.colorfulErrorExtra,
+        "important",
+      );
+    } else {
+      styleEl()?.setHtml(css);
+    }
+  };
+
+  if (envConfig.isDesktop) {
+    // The Tauri window starts hidden. WKWebView can suspend a debounced timer
+    // before the window is revealed, leaving the fallback Serika colors in
+    // place even though the selected theme and theme indicator are correct.
+    createEffectOn(getTheme, applyThemeColors);
+  } else {
+    createDebouncedEffectOn(125, getTheme, applyThemeColors);
+  }
 
   const isThemeWithCss = () => {
     const name = getThemeName();
@@ -69,13 +110,39 @@ export function Theme(): JSXElement {
     } else {
       hideLoaderBar();
     }
-    linkEl()?.setAttribute("href", hasCss ? `/themes/${name}.css` : "");
+    if (envConfig.isDesktop) {
+      const existing =
+        document.head.querySelector<HTMLLinkElement>("#currentTheme");
+      if (!hasCss) {
+        existing?.remove();
+        hideLoaderBar();
+      } else {
+        const link = existing ?? document.createElement("link");
+        link.id = "currentTheme";
+        link.rel = "stylesheet";
+        if (existing === null) {
+          link.addEventListener("load", onLoad);
+          link.addEventListener("error", onError);
+        }
+        link.dataset["name"] = name;
+        link.href = `/themes/${name}.css`;
+        if (existing === null) document.head.append(link);
+      }
+
+      const meta =
+        document.head.querySelector<HTMLMetaElement>("#metaThemeColor");
+      meta?.setAttribute("content", getTheme().bg);
+    } else {
+      linkEl()?.setAttribute("href", hasCss ? `/themes/${name}.css` : "");
+    }
   });
 
   return (
     <MetaProvider>
-      <Style id="theme" ref={styleRef} />
-      <Show when={isThemeWithCss()}>
+      <Show when={!envConfig.isDesktop}>
+        <Style id="theme" ref={styleRef} />
+      </Show>
+      <Show when={!envConfig.isDesktop && isThemeWithCss()}>
         <Link
           ref={linkRef}
           rel="stylesheet"

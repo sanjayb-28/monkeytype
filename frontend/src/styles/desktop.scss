@@ -1,0 +1,26 @@
+body.desktop {
+  [data-electron-drag-region] {
+    -webkit-app-region: drag;
+  }
+
+  [data-electron-drag-region] button,
+  [data-electron-drag-region] a,
+  [data-electron-drag-region] [role="button"] {
+    -webkit-app-region: no-drag;
+  }
+
+  .advertisement,
+  [id^="ad-"] {
+    display: none !important;
+  }
+
+  .desktopDashboard {
+    padding-bottom: 4rem;
+  }
+
+  // WebKit does not consistently honor the web app's `visible clip`
+  // overflow shorthand. Keep the measured three-line test viewport clipped.
+  .pageTest #wordsWrapper:not(.tape) {
+    overflow: hidden;
+  }
+}

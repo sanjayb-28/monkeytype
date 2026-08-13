@@ -112,6 +112,7 @@ dep-graph.png
 
 # TypeScript
 build/
+desktop/release/
 backend/workers
 *.tsbuildinfo
 

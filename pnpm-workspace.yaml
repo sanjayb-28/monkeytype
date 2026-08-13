@@ -1,6 +1,7 @@
 packages:
   - frontend
   - backend
+  - desktop
   - packages/*
   - frontend/storybook
 
@@ -12,6 +13,7 @@ onlyBuiltDependencies:
   - core-js
   - cpu-features
   - esbuild
+  - electron
   - msgpackr-extract
   - protobufjs
   - re2

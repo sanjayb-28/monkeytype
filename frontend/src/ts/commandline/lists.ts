@@ -36,6 +36,7 @@ import {
 } from "../components/layout/overlays/FpsCounter";
 import { applyConfigFromJson } from "../config/lifecycle";
 import { getLastEventLog } from "../states/test";
+import { envConfig } from "virtual:env-config";
 
 const adsCommands = buildCommands("ads");
 
@@ -75,14 +76,18 @@ export const commands: CommandsSubgroup = {
     },
     ...QuoteFavoriteCommands,
     ...BailOutCommands,
-    {
-      id: "shareTestSettings",
-      display: "Share test settings",
-      icon: "fa-share",
-      exec: (): void => {
-        showModal("ShareTestSettings");
-      },
-    },
+    ...(envConfig.isDesktop
+      ? []
+      : [
+          {
+            id: "shareTestSettings",
+            display: "Share test settings",
+            icon: "fa-share",
+            exec: (): void => {
+              showModal("ShareTestSettings");
+            },
+          } satisfies Command,
+        ]),
 
     //account
     ...TagsCommands,
@@ -207,7 +212,7 @@ export const commands: CommandsSubgroup = {
     ),
 
     //danger zone
-    ...adsCommands,
+    ...(envConfig.isDesktop ? [] : adsCommands),
 
     //other
     ...LoadChallengeCommands,
@@ -217,8 +222,9 @@ export const commands: CommandsSubgroup = {
       display: "Watch video ad",
       alias: "support donate",
       icon: "fa-ad",
+      available: () => !envConfig.isDesktop,
       exec: (): void => {
-        void VideoAdPopup.show();
+        if (!envConfig.isDesktop) void VideoAdPopup.show();
       },
     },
     {
@@ -251,26 +257,30 @@ export const commands: CommandsSubgroup = {
         clearAllNotifications();
       },
     },
-    {
-      id: "clearSwCache",
-      display: "Clear SW cache",
-      icon: "fa-cog",
-      exec: async (): Promise<void> => {
-        const clist = await caches.keys();
-        for (const name of clist) {
-          await caches.delete(name);
-        }
-        window.location.reload();
-      },
-    },
-    {
-      id: "getSwCache",
-      display: "Get SW cache",
-      icon: "fa-cog",
-      exec: async (): Promise<void> => {
-        alert(await caches.keys());
-      },
-    },
+    ...(envConfig.isDesktop
+      ? []
+      : ([
+          {
+            id: "clearSwCache",
+            display: "Clear SW cache",
+            icon: "fa-cog",
+            exec: async (): Promise<void> => {
+              const clist = await caches.keys();
+              for (const name of clist) {
+                await caches.delete(name);
+              }
+              window.location.reload();
+            },
+          },
+          {
+            id: "getSwCache",
+            display: "Get SW cache",
+            icon: "fa-cog",
+            exec: async (): Promise<void> => {
+              alert(await caches.keys());
+            },
+          },
+        ] satisfies Command[])),
     {
       id: "copyResultStats",
       display: "Copy last event log (result data)",
@@ -345,6 +355,7 @@ export const commands: CommandsSubgroup = {
       id: "joinDiscord",
       display: "Join the Discord server",
       icon: "fa-users",
+      visible: !envConfig.isDesktop,
       exec: (): void => {
         window.open("https://discord.gg/monkeytype");
       },

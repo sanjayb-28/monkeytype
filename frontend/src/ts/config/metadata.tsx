@@ -2,6 +2,7 @@ import { checkCompatibility } from "@monkeytype/funbox";
 import * as ConfigSchemas from "@monkeytype/schemas/configs";
 import { roundTo1 } from "@monkeytype/util/numbers";
 import { JSXElement } from "solid-js";
+import { envConfig } from "virtual:env-config";
 
 import * as CustomThemes from "../collections/custom-themes";
 import { getDefaultConfig } from "../constants/default-config";
@@ -279,8 +280,9 @@ export const configMetadata: ConfigMetadataObject = {
     displayString: "quick restart",
     changeRequiresRestart: false,
     group: "behavior",
-    description:
-      'Press tab, esc or enter to quickly restart the test, or to quickly jump to the test page. These options disable tab navigation on most parts of the website. Using the "esc" option will move opening the commandline to the tab key.',
+    description: envConfig.isDesktop
+      ? 'Press tab, esc or enter to quickly restart the test, or to jump to the typing screen. These options disable tab navigation in most of the app. Using the "esc" option moves the command line shortcut to the tab key.'
+      : 'Press tab, esc or enter to quickly restart the test, or to quickly jump to the test page. These options disable tab navigation on most parts of the website. Using the "esc" option will move opening the commandline to the tab key.',
   },
   repeatQuotes: {
     key: "repeatQuotes",
@@ -297,8 +299,9 @@ export const configMetadata: ConfigMetadataObject = {
     displayString: "result saving",
     changeRequiresRestart: false,
     group: "behavior",
-    description:
-      'Set this setting to "off" in case you want to practice without saving new results to your account and affecting your statistics.',
+    description: envConfig.isDesktop
+      ? 'Set this setting to "off" to practice without saving new results to local activity or affecting your statistics.'
+      : 'Set this setting to "off" in case you want to practice without saving new results to your account and affecting your statistics.',
   },
   blindMode: {
     key: "blindMode",
@@ -404,16 +407,14 @@ export const configMetadata: ConfigMetadataObject = {
     displayString: "british english",
     changeRequiresRestart: true,
     group: "behavior",
-    description:
-      "When enabled, the website will use the British spelling instead of American. Note that this might not replace all words correctly. If you find any issues, please let us know.",
+    description: `When enabled, the ${envConfig.isDesktop ? "app" : "website"} will use British spelling instead of American. Note that this might not replace all words correctly.`,
   },
   funbox: {
     key: "funbox",
     fa: { icon: "fa-gamepad" },
     changeRequiresRestart: true,
     group: "behavior",
-    description:
-      "These are special modes that change the website in some special way (by altering the word generation, behavior of the website or the looks). Give each one of them a try!",
+    description: `Special modes that change word generation, test behavior, or the look of the ${envConfig.isDesktop ? "app" : "website"}. Give each one a try.`,
     isBlocked: ({ value, currentConfig }) => {
       if (!checkCompatibility(value)) {
         showNoticeNotification(
@@ -734,9 +735,15 @@ export const configMetadata: ConfigMetadataObject = {
     },
     isBlocked: ({ value }) => {
       if (document.readyState === "complete") {
-        if ((value === "pb" || value === "tagPb") && !isAuthenticated()) {
+        if (value === "pb" && !isAuthenticated() && !envConfig.isDesktop) {
           showNoticeNotification(
-            `Pace caret "pb" and "tag pb" are unavailable without an account`,
+            `Pace caret "pb" is unavailable without an account`,
+          );
+          return true;
+        }
+        if (value === "tagPb" && !isAuthenticated() && !envConfig.isDesktop) {
+          showNoticeNotification(
+            `Pace caret "tag pb" is unavailable without an account`,
           );
           return true;
         }
@@ -907,8 +914,7 @@ export const configMetadata: ConfigMetadataObject = {
     changeRequiresRestart: false,
     displayString: "show all lines",
     group: "appearance",
-    description:
-      "When enabled, the website will show all lines for word, custom and quote mode tests - otherwise the lines will be limited to 3, and will automatically scroll. Using this could cause the timer text and live speed to not be visible.",
+    description: `When enabled, the ${envConfig.isDesktop ? "app" : "website"} will show all lines for word, custom and quote mode tests. Otherwise, the test is limited to three lines and scrolls automatically. This can hide the timer and live speed.`,
     isBlocked: ({ value, currentConfig }) => {
       if (value && currentConfig.tapeMode !== "off") {
         showNoticeNotification("Show all lines doesn't support tape mode.");
@@ -970,8 +976,7 @@ export const configMetadata: ConfigMetadataObject = {
     displayString: "font family",
     changeRequiresRestart: false,
     group: "appearance",
-    description:
-      "Change the font family used by the website. Using a local font will override your choice. ",
+    description: `Change the font family used by the ${envConfig.isDesktop ? "app" : "website"}. A local font overrides this choice.`,
     optionsMetadata: {
       Comic_Sans_MS: {
         displayString: "Helvetica",
@@ -1057,8 +1062,7 @@ export const configMetadata: ConfigMetadataObject = {
     displayString: "colorful mode",
     changeRequiresRestart: false,
     group: "theme",
-    description:
-      "When enabled, the test words will use the main color, instead of the text color, making the website more colorful.",
+    description: `When enabled, test words use the main color instead of the text color, making the ${envConfig.isDesktop ? "app" : "website"} more colorful.`,
   },
   customBackground: {
     key: "customBackground",
@@ -1133,7 +1137,7 @@ export const configMetadata: ConfigMetadataObject = {
     },
     isBlocked: ({ value }) => {
       if (value === "custom") {
-        if (!isAuthenticated()) {
+        if (!isAuthenticated() && !envConfig.isDesktop) {
           showNoticeNotification(
             "Random theme 'custom' is unavailable without an account",
           );
@@ -1161,8 +1165,7 @@ export const configMetadata: ConfigMetadataObject = {
     fa: { icon: "fa-palette" },
     changeRequiresRestart: false,
     group: "theme",
-    description:
-      "Completely change the look and feel of the website by picking one of the presets, or by creating your own completely custom theme.",
+    description: `Change the look and feel of the ${envConfig.isDesktop ? "app" : "website"} with a preset or a custom theme.`,
     overrideConfig: () => {
       return {
         customTheme: false,

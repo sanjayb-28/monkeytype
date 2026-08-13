@@ -87,8 +87,8 @@ import {
 } from "./funbox/list";
 import { getFunbox } from "@monkeytype/funbox";
 import * as CompositionState from "../legacy-states/composition";
-import { SnapshotResult } from "../constants/default-snapshot";
 import { WordGenError } from "../utils/word-gen-error";
+import { SnapshotResult } from "../constants/default-snapshot";
 import { tryCatch } from "@monkeytype/util/trycatch";
 import * as Sentry from "../sentry";
 import { showLoaderBar, hideLoaderBar } from "../states/loader-bar";
@@ -100,6 +100,11 @@ import { debounce } from "throttle-debounce";
 import { qs } from "../utils/dom";
 import { setAccountButtonSpinner } from "../states/header";
 import { Config } from "../config/store";
+import { envConfig } from "virtual:env-config";
+import { normalizeResult } from "../desktop/result-normalization";
+import { getDesktopPersonalBestDecision } from "../desktop/personal-best";
+import { calculateDesktopProgression } from "../desktop/progression";
+import { loadDesktopData } from "../desktop/storage";
 import { setQuoteLengthAll, toggleFunbox, setConfig } from "../config/setters";
 import {
   resetTestEvents,
@@ -388,7 +393,11 @@ async function init(): Promise<boolean> {
   }
 
   if (Config.mode === "quote") {
-    if (Config.quoteLength.includes(-3) && !isAuthenticated()) {
+    if (
+      Config.quoteLength.includes(-3) &&
+      !isAuthenticated() &&
+      !envConfig.isDesktop
+    ) {
       setQuoteLengthAll();
     }
   }
@@ -1040,8 +1049,44 @@ export async function finish(difficultyFailed = false): Promise<void> {
 
   let savingResultPromise: ReturnType<typeof saveResult> =
     Promise.resolve(null);
+  let desktopResult: DB.SaveLocalResultData | undefined;
+  let desktopShouldShowConfetti = false;
   const user = getAuthenticatedUser();
-  if (user !== null) {
+  if (envConfig.isDesktop) {
+    if (!dontSave && Config.resultSaving) {
+      resetIncompleteTests();
+      if (!completedEvent.bailedOut) {
+        const challenge = ChallengeContoller.verify(completedEvent);
+        if (challenge !== null) completedEvent.challenge = challenge;
+      }
+      const previousPb = DB.getLocalPB(
+        completedEvent.mode,
+        completedEvent.mode2,
+        completedEvent.punctuation,
+        completedEvent.numbers,
+        completedEvent.language,
+        completedEvent.difficulty,
+        completedEvent.lazyMode,
+        getFunbox(completedEvent.funbox),
+      );
+      const personalBest = getDesktopPersonalBestDecision(
+        completedEvent,
+        previousPb?.wpm,
+      );
+      const localResult = normalizeResult({
+        ...structuredClone(completedEvent),
+        _id: crypto.randomUUID(),
+        isPb: personalBest.isPersonalBest,
+        name: "local",
+      });
+      desktopResult = {
+        result: localResult,
+        isPb: personalBest.isPersonalBest,
+        ...calculateDesktopProgression(completedEvent, loadDesktopData()),
+      };
+      desktopShouldShowConfetti = personalBest.shouldCelebrate;
+    }
+  } else if (user !== null) {
     // logged in
     if (dontSave) {
       void AnalyticsController.log("testCompletedInvalid");
@@ -1084,6 +1129,24 @@ export async function finish(difficultyFailed = false): Promise<void> {
   );
 
   await Promise.all([savingResultPromise, resultUpdatePromise]);
+  if (desktopResult !== undefined) {
+    try {
+      await DB.saveLocalResult(desktopResult);
+      qs("#result .stats .tags .editTagsButton")?.setAttribute(
+        "data-result-id",
+        desktopResult.result?._id ?? "",
+      );
+      qs("#result .stats .tags .editTagsButton")?.removeClass("invisible");
+      if (desktopResult.isPb) {
+        if (desktopShouldShowConfetti) {
+          Result.showConfetti();
+        }
+        Result.showCrown("normal");
+      }
+    } catch (error) {
+      showErrorNotification("Failed to save this result locally", { error });
+    }
+  }
 }
 
 async function saveResult(
@@ -1221,7 +1284,7 @@ async function saveResult(
   if (isRetrying) {
     showSuccessNotification("Result saved", { important: true });
   }
-  DB.saveLocalResult(localDataToSave);
+  await DB.saveLocalResult(localDataToSave);
   return response;
 }
 

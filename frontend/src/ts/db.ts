@@ -36,6 +36,16 @@ import { __nonReactive } from "./collections/tags";
 import { fetchUserFromApi } from "./ape/user";
 import { SnapshotInitError } from "./utils/snapshot-init-error";
 import { updateTagsInFilterStorage } from "./states/result-filters";
+import { envConfig } from "virtual:env-config";
+import {
+  initializeDesktopStorage,
+  loadDesktopData,
+  saveDesktopData,
+} from "./desktop/storage";
+import {
+  buildDesktopTestActivity,
+  buildDesktopTestActivityForYear,
+} from "./desktop/activity";
 
 let dbSnapshot: Snapshot | undefined;
 const firstDayOfTheWeek = getFirstDayOfTheWeek();
@@ -46,7 +56,7 @@ export function getSnapshot(): Snapshot | undefined {
 
 export function setSnapshot(
   newSnapshot: Snapshot | undefined,
-  options?: { dispatchEvent?: boolean },
+  options?: { dispatchEvent?: boolean; persistDesktop?: boolean },
 ): void {
   const originalBanned = dbSnapshot?.banned;
   const originalVerified = dbSnapshot?.verified;
@@ -74,11 +84,50 @@ export function setSnapshot(
   }
 
   setSolidSnapshot(newSnapshot);
+
+  if (
+    envConfig.isDesktop &&
+    newSnapshot !== undefined &&
+    options?.persistDesktop !== false
+  ) {
+    void saveDesktopData({
+      favoriteQuotes: newSnapshot.favoriteQuotes ?? {},
+      personalBests: newSnapshot.personalBests,
+      typingStats: newSnapshot.typingStats,
+      xp: newSnapshot.xp,
+      streak: newSnapshot.streak,
+      maxStreak: newSnapshot.maxStreak,
+    }).catch((error: unknown) => {
+      showErrorNotification("Failed to save local Monkeytype data", { error });
+    });
+  }
 }
 
 export async function initSnapshot(): Promise<Snapshot | false> {
   //send api request with token that returns tags, presets, and data needed for snap
   const snap = getDefaultSnapshot();
+
+  if (envConfig.isDesktop) {
+    await initializeDesktopStorage();
+    const local = loadDesktopData();
+    snap.name = "local";
+    snap.uid = "local";
+    snap.favoriteQuotes = local.favoriteQuotes;
+    snap.personalBests = local.personalBests;
+    snap.typingStats = local.typingStats;
+    snap.xp = local.xp;
+    snap.streak = local.streak;
+    snap.maxStreak = local.maxStreak;
+    snap.addedAt =
+      local.results.length === 0
+        ? Date.now()
+        : Math.min(...local.results.map((result) => result.timestamp));
+    snap.testActivity = buildDesktopTestActivity(local.results);
+    dbSnapshot = snap;
+    setSolidSnapshot(snap);
+    return snap;
+  }
+
   await configurationPromise;
 
   try {
@@ -307,7 +356,9 @@ export type SaveLocalResultData = {
   isPb?: boolean;
 };
 
-export function saveLocalResult(data: SaveLocalResultData): void {
+export async function saveLocalResult(
+  data: SaveLocalResultData,
+): Promise<void> {
   const snapshot = getSnapshot();
   if (!snapshot) return;
 
@@ -362,8 +413,21 @@ export function saveLocalResult(data: SaveLocalResultData): void {
     }
   }
 
+  if (envConfig.isDesktop) {
+    await saveDesktopData({
+      appendResult: data.result,
+      favoriteQuotes: snapshot.favoriteQuotes ?? {},
+      personalBests: snapshot.personalBests,
+      typingStats: snapshot.typingStats,
+      xp: snapshot.xp,
+      streak: snapshot.streak,
+      maxStreak: snapshot.maxStreak,
+    });
+  }
+
   setSnapshot(snapshot, {
     dispatchEvent: false,
+    persistDesktop: false,
   });
   if (data.xp !== undefined) {
     setXpBarData({
@@ -412,13 +476,24 @@ export function addBadge(badge: Badge): void {
 export async function getTestActivityCalendar(
   yearString: string,
 ): Promise<TestActivityCalendar | undefined> {
-  if (!isAuthenticated() || dbSnapshot === undefined) return undefined;
+  if (
+    (!isAuthenticated() && !envConfig.isDesktop) ||
+    dbSnapshot === undefined
+  ) {
+    return undefined;
+  }
 
   if (yearString === "current") return dbSnapshot.testActivity;
 
   const currentYear = new Date().getFullYear().toString();
   if (yearString === currentYear) {
     return dbSnapshot.testActivity?.getFullYearCalendar();
+  }
+
+  if (envConfig.isDesktop) {
+    const year = Number.parseInt(yearString, 10);
+    if (!Number.isInteger(year)) return undefined;
+    return buildDesktopTestActivityForYear(loadDesktopData().results, year);
   }
 
   if (dbSnapshot.testActivityByYear === undefined) {

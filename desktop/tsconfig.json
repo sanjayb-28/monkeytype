@@ -1,0 +1,9 @@
+{
+  "extends": "@monkeytype/typescript-config/base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM"],
+    "target": "ES2024",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}
