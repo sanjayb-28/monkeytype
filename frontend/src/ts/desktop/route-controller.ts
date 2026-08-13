@@ -31,6 +31,34 @@ const pageSelectors = {
 
 let firstNavigation = true;
 
+async function animateOpacity(
+  element: ReturnType<typeof qsr>,
+  from: number,
+  to: number,
+  duration: number,
+): Promise<void> {
+  if (duration === 0) {
+    element.setStyle({ opacity: String(to) });
+    return;
+  }
+
+  const animation = element.native.animate(
+    [{ opacity: String(from) }, { opacity: String(to) }],
+    {
+      duration,
+      easing: "ease-out",
+      fill: "forwards",
+    },
+  );
+  const fallback = new Promise<void>((resolve) => {
+    setTimeout(resolve, duration + 100);
+  });
+
+  await Promise.race([animation.finished.catch(() => undefined), fallback]);
+  animation.cancel();
+  element.setStyle({ opacity: String(to) });
+}
+
 async function showPage(page: keyof typeof pageSelectors): Promise<void> {
   const previousPage = getActivePage();
   if (!firstNavigation && previousPage === page) return;
@@ -48,10 +76,7 @@ async function showPage(page: keyof typeof pageSelectors): Promise<void> {
     if (previousElement !== null) {
       if (previousPage === "test") await PageTest.page.beforeHide?.();
       previousElement.show().setStyle({ opacity: "1" });
-      await previousElement.promiseAnimate({
-        opacity: "0",
-        duration: duration / 2,
-      });
+      await animateOpacity(previousElement, 1, 0, duration / 2);
       previousElement.hide();
       if (previousPage === "test") await PageTest.page.afterHide?.();
     } else {
@@ -64,10 +89,7 @@ async function showPage(page: keyof typeof pageSelectors): Promise<void> {
     }
 
     nextElement.show().setStyle({ opacity: "0" }).addClass("active");
-    await nextElement.promiseAnimate({
-      opacity: "1",
-      duration: duration / 2,
-    });
+    await animateOpacity(nextElement, 0, 1, duration / 2);
 
     if (page === "test") {
       Misc.updateTitle();

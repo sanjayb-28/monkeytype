@@ -372,6 +372,13 @@ export default defineConfig(({ mode }): UserConfig => {
       alias: isDesktop
         ? [
             {
+              find: /^(?:\.\.?\/)+auth$/,
+              replacement: path.resolve(
+                __dirname,
+                "src/ts/desktop/stubs/auth.ts",
+              ),
+            },
+            {
               find: /^.*\/controllers\/ad-controller$/,
               replacement: path.resolve(
                 __dirname,

@@ -1,6 +1,6 @@
 {
   "name": "@monkeytype/desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Offline macOS Apple Silicon port of Monkeytype using Electron",
   "license": "GPL-3.0",
@@ -15,8 +15,9 @@
     "dev:electron": "wait-on tcp:127.0.0.1:3000 build/main.js && cross-env MONKEYTYPE_DESKTOP_DEV_URL=http://127.0.0.1:3000/desktop.html electron .",
     "dev:main": "tsup src/main.ts src/preload.ts --format cjs --platform node --external electron --out-dir build --watch",
     "dev:renderer": "cross-env MONKEYTYPE_DESKTOP=true SERVER_OPEN=false pnpm --dir ../frontend dev",
-    "package": "pnpm run build:renderer && pnpm run build:main && electron-builder --mac dir --arm64",
-    "pack": "pnpm run build:renderer && pnpm run build:main && electron-builder --mac dmg --arm64"
+    "package": "pnpm run build:renderer && pnpm run verify:bundle && pnpm run build:main && electron-builder --mac dir --arm64",
+    "pack": "pnpm run build:renderer && pnpm run verify:bundle && pnpm run build:main && electron-builder --mac dmg --arm64",
+    "verify:bundle": "node scripts/verify-offline-bundle.mts"
   },
   "devDependencies": {
     "@monkeytype/typescript-config": "workspace:*",
@@ -31,6 +32,7 @@
   },
   "build": {
     "appId": "com.monkeytype.desktop",
+    "afterPack": "scripts/after-pack.mts",
     "productName": "Monkeytype",
     "asar": true,
     "files": [
@@ -48,6 +50,12 @@
     "mac": {
       "artifactName": "Monkeytype-${version}-${arch}.${ext}",
       "category": "public.app-category.utilities",
+      "extendInfo": {
+        "NSBluetoothAlwaysUsageDescription": null,
+        "NSBluetoothPeripheralUsageDescription": null,
+        "NSCameraUsageDescription": null,
+        "NSMicrophoneUsageDescription": null
+      },
       "icon": "../frontend/static/images/mt-icon-512.png",
       "minimumSystemVersion": "26.0",
       "target": [

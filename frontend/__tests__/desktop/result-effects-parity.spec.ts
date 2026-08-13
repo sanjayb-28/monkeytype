@@ -20,10 +20,12 @@ describe("desktop result effect parity", () => {
     expect(resultSource.match(/void confetti\(\{/g)).toHaveLength(2);
     expect(testLogicSource).toContain("Result.showConfetti();");
     // The Electron renderer uses Chromium's native animation and worker path.
-    // The offline boundary blocks only remote network schemes, not Blob workers.
+    // Remote requests and unrelated device/browser permissions are denied, while
+    // Blob workers used by canvas-confetti remain available.
     expect(electronMainSource).toContain('"http://*/*"');
     expect(electronMainSource).toContain('"wss://*/*"');
-    expect(electronMainSource).not.toContain("setPermissionRequestHandler");
+    expect(electronMainSource).toContain("setPermissionRequestHandler");
+    expect(electronMainSource).toContain('"clipboard-sanitized-write"');
   });
 
   it("shows the original PB crown only after the local result is saved", async () => {

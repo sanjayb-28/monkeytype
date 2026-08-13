@@ -96,6 +96,38 @@ function installOfflineBoundary(): void {
       callback({ cancel: true });
     },
   );
+
+  const isTrustedPermissionOrigin = (origin: string): boolean => {
+    try {
+      const url = new URL(origin);
+      if (url.protocol === `${DESKTOP_SCHEME}:` && url.host === "app") {
+        return true;
+      }
+      return (
+        isDevelopment &&
+        DEV_URL !== undefined &&
+        url.origin === new URL(DEV_URL).origin
+      );
+    } catch {
+      return false;
+    }
+  };
+  const isAllowedPermission = (
+    permission: string,
+    requestingOrigin: string,
+  ): boolean =>
+    permission === "clipboard-sanitized-write" &&
+    isTrustedPermissionOrigin(requestingOrigin);
+
+  session.defaultSession.setPermissionCheckHandler(
+    (_webContents, permission, requestingOrigin) =>
+      isAllowedPermission(permission, requestingOrigin),
+  );
+  session.defaultSession.setPermissionRequestHandler(
+    (_webContents, permission, callback, details) => {
+      callback(isAllowedPermission(permission, details.requestingUrl));
+    },
+  );
 }
 
 function registerIpc(): void {

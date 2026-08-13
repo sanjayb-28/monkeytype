@@ -1,0 +1,30 @@
+name: Desktop Release
+
+on:
+  push:
+    tags: ["desktop-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.28.1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.11.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir frontend exec vitest run __tests__/desktop
+      - name: Verify release version
+        run: test "$(node -p "require('./desktop/package.json').version")" = "${GITHUB_REF_NAME#desktop-v}"
+      - run: pnpm --dir desktop run pack
+      - name: Publish release
+        run: gh release create "$GITHUB_REF_NAME" desktop/release/Monkeytype-*.dmg --title "Monkeytype Desktop ${GITHUB_REF_NAME#desktop-v}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
