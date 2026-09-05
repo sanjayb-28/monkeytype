@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 const api = {
+  checkForUpdates: async (): Promise<void> => {
+    await ipcRenderer.invoke("desktop:check-for-updates");
+  },
+  appVersion: async (): Promise<string> => {
+    const value: unknown = await ipcRenderer.invoke("desktop:app-version");
+    if (typeof value !== "string") throw new Error("Invalid version response");
+    return value;
+  },
   openTextFile: async (): Promise<string | null> => {
     const value: unknown = await ipcRenderer.invoke("desktop:open-text-file");
     if (value !== null && typeof value !== "string") {

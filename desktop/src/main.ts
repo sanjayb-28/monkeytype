@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  Menu,
   net,
   protocol,
   session,
@@ -14,6 +15,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { checkForUpdates } from "./updates";
 
 const DESKTOP_SCHEME = "monkeytype";
 const DEV_URL = process.env["MONKEYTYPE_DESKTOP_DEV_URL"];
@@ -131,6 +133,14 @@ function installOfflineBoundary(): void {
 }
 
 function registerIpc(): void {
+  ipcMain.handle("desktop:check-for-updates", async (event) => {
+    requireTrustedSender(event);
+    await checkForUpdates();
+  });
+  ipcMain.handle("desktop:app-version", (event) => {
+    requireTrustedSender(event);
+    return app.getVersion();
+  });
   ipcMain.handle("desktop:show-main-window", (event) => {
     requireTrustedSender(event);
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -230,6 +240,34 @@ void app
     registerRendererProtocol();
     installOfflineBoundary();
     registerIpc();
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate([
+        {
+          label: "Monkeytype",
+          submenu: [
+            { role: "about" },
+            {
+              label: "Check for updates…",
+              click: () => {
+                void checkForUpdates();
+              },
+            },
+            { type: "separator" },
+            { role: "services" },
+            { type: "separator" },
+            { role: "hide" },
+            { role: "hideOthers" },
+            { role: "unhide" },
+            { type: "separator" },
+            { role: "quit" },
+          ],
+        },
+        { role: "fileMenu" },
+        { role: "editMenu" },
+        { role: "viewMenu" },
+        { role: "windowMenu" },
+      ]),
+    );
     await createMainWindow();
   })
   .catch(() => app.quit());

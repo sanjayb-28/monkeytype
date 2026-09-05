@@ -1,4 +1,6 @@
 type MonkeytypeDesktopApi = {
+  checkForUpdates: () => Promise<void>;
+  appVersion: () => Promise<string>;
   openTextFile: () => Promise<string | null>;
   reload: () => void;
   saveTextFile: (suggestedName: string, contents: string) => Promise<boolean>;

@@ -1,11 +1,32 @@
-import type { JSXElement } from "solid-js";
+import { createSignal, onMount, Show, type JSXElement } from "solid-js";
 
+import { Button } from "../../components/common/Button";
 import { H2, H3 } from "../../components/common/Headers";
 import { Page } from "../../components/common/Page";
 import { CommandlineHotkey } from "../../components/hotkeys/CommandlineHotkey";
 import { QuickRestartHotkey } from "../../components/hotkeys/QuickRestartHotkey";
 
 export function DesktopAboutPage(): JSXElement {
+  const [version, setVersion] = createSignal("");
+  const [updating, setUpdating] = createSignal(false);
+  const [updateError, setUpdateError] = createSignal("");
+  onMount(() => {
+    void window.monkeytypeDesktop
+      ?.appVersion()
+      .then(setVersion)
+      .catch(() => setVersion(""));
+  });
+  const checkUpdates = async (): Promise<void> => {
+    setUpdating(true);
+    setUpdateError("");
+    try {
+      await window.monkeytypeDesktop?.checkForUpdates();
+    } catch {
+      setUpdateError("Could not check for updates. Please try again.");
+    } finally {
+      setUpdating(false);
+    }
+  };
   return (
     <Page id="about">
       <div class="content-grid grid gap-8">
@@ -23,6 +44,24 @@ export function DesktopAboutPage(): JSXElement {
             Settings, personal bests, and test history stay on this Mac.
           </p>
         </section>
+        <Show when={window.monkeytypeDesktop !== undefined}>
+          <section class="grid gap-4">
+            <H3 fa={{ icon: "fa-download" }} text="app updates" />
+            <p>Version {version()}. Updates are checked only when you ask.</p>
+            <Button
+              class="justify-self-start"
+              fa={{ icon: "fa-sync-alt" }}
+              text={updating() ? "checking / updating…" : "check for updates"}
+              disabled={updating()}
+              onClick={() => {
+                void checkUpdates();
+              }}
+            />
+            <p role="status" class="text-sub">
+              {updateError()}
+            </p>
+          </section>
+        </Show>
         <section>
           <H3 fa={{ icon: "fa-keyboard" }} text="keybinds" />
           <p>
@@ -35,8 +74,9 @@ export function DesktopAboutPage(): JSXElement {
           <H3 fa={{ icon: "fa-lock" }} text="offline by design" />
           <p>
             The app is packaged without web authentication, advertising,
-            telemetry, or update checks. Its content policy only permits bundled
-            app resources and local native file dialogs.
+            telemetry, or background update checks. Typing and your data stay
+            offline. Checking for updates contacts GitHub; installing an update
+            uses Homebrew and preserves your settings and history.
           </p>
         </section>
         <section>
